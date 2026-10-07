@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Referee Call Trainer</title>
+<meta name="description" content="A football referee trainer with a timed match mode and practice quizzes on signals and decisions, based on the IFAB Laws of the Game 2026/27.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%2314201a'/%3E%3Crect x='10' y='6' width='12' height='20' rx='2' fill='%23f2c400'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+html{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+
+/* Layout: one narrow match-card column. Mode switch and score on top, one question at a time, feedback under the options. */
+:root{
+  --bg:#eef1ec; --surface:#fbfcfa; --ink:#14201a; --muted:#56645b; --line:#cdd5ce;
+  --accent:#f2c400; --accent-ink:#14201a;
+  --good:#1b7a43; --good-bg:#dff1e5; --bad:#b8261d; --bad-bg:#f8e1de;
+  --kit:#1a231e; --limb:#8b978e; --flag-red:#d4291f; --grass:#dde8dd; --team-a:#23406e; --team-b:#8c2f4b; --ball:#ffffff;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1612; --surface:#17211b; --ink:#e8eee9; --muted:#9aa89e; --line:#2c3a31;
+    --accent:#f5cc1a; --accent-ink:#14201a;
+    --good:#56c98a; --good-bg:#173524; --bad:#f2776d; --bad-bg:#3d1b18;
+    --kit:#3d4f44; --limb:#b3beb6; --flag-red:#e2463c; --grass:#1b2a20; --team-a:#8fb4ee; --team-b:#e58aa6; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1612; --surface:#17211b; --ink:#e8eee9; --muted:#9aa89e; --line:#2c3a31;
+  --accent:#f5cc1a; --accent-ink:#14201a;
+  --good:#56c98a; --good-bg:#173524; --bad:#f2776d; --bad-bg:#3d1b18;
+  --kit:#3d4f44; --limb:#b3beb6; --flag-red:#e2463c; --grass:#1b2a20; --team-a:#8fb4ee; --team-b:#e58aa6; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:680px;margin-inline:auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--display);font-weight:700;font-size:2rem;line-height:1;margin:0;text-transform:uppercase;letter-spacing:.02em}
+h1 span{background:var(--accent);color:var(--accent-ink);padding:0 .25em;margin-left:.1em}
+.best{font-size:.85rem;color:var(--muted)}
+.modes{display:flex;flex-wrap:wrap;gap:8px}
+.modes button{font:600 1rem var(--display);letter-spacing:.06em;text-transform:uppercase;padding:7px 14px;border:1.5px solid var(--line);background:transparent;color:var(--muted);border-radius:3px;cursor:pointer}
+.modes button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.status{display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:var(--display);font-size:1.15rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;font-variant-numeric:tabular-nums}
+.pips{display:flex;gap:4px;flex:1;min-width:0;margin-inline:12px}
+.pips i{flex:1;height:6px;background:var(--line);border-radius:1px}
+.pips i.ok{background:var(--good)} .pips i.no{background:var(--bad)} .pips i.now{background:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:20px;display:flex;flex-direction:column;gap:16px}
+.kind{font-family:var(--display);font-weight:600;font-size:.95rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;gap:10px;align-items:center}
+.kind b{background:var(--ink);color:var(--bg);padding:1px 7px;font-variant-numeric:tabular-nums;font-weight:600}
+.q{font-size:1.2rem;font-weight:600;line-height:1.35;margin:0;text-wrap:balance}
+.ctx{margin:0;color:var(--muted)}
+.stage{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:start}
+.stage>*{min-width:0}
+.fig{background:var(--bg);border:1px solid var(--line);border-radius:4px;max-width:100%}
+.fig svg{display:block;width:100%;height:auto}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opts button{font:500 1rem var(--body);text-align:left;padding:12px 14px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:3px;cursor:pointer;display:flex;gap:10px;align-items:baseline}
+.opts button em{font:600 1rem var(--display);font-style:normal;color:var(--muted);flex:none;width:1.1em}
+.opts button:hover:not(:disabled){border-color:var(--ink)}
+.opts button:disabled{cursor:default;opacity:.75}
+.opts button.right{border-color:var(--good);background:var(--good-bg);opacity:1}
+.opts button.wrong{border-color:var(--bad);background:var(--bad-bg);opacity:1}
+.opts button.right em{color:var(--good)} .opts button.wrong em{color:var(--bad)}
+.fb{border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.fb p{margin:0;max-width:62ch}
+.fb strong.ok{color:var(--good)} .fb strong.no{color:var(--bad)}
+.law{font-size:.85rem;color:var(--muted)}
+.go{align-self:flex-start;font:700 1.1rem var(--display);letter-spacing:.08em;text-transform:uppercase;padding:10px 22px;background:var(--accent);color:var(--accent-ink);border:0;border-radius:3px;cursor:pointer}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.total{font-family:var(--display);font-weight:700;font-size:4rem;line-height:1;font-variant-numeric:tabular-nums}
+.total small{font-size:1.6rem;color:var(--muted);font-weight:600}
+.review{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.review li{border-left:3px solid var(--bad);padding-left:12px}
+.review .a{color:var(--good);font-weight:600}
+footer{font-size:.85rem;color:var(--muted);max-width:62ch}
+/* figure */
+.f-limb{stroke:var(--limb);stroke-width:9;stroke-linecap:round;fill:none}
+.f-leg{stroke:var(--kit);stroke-width:11;stroke-linecap:round;fill:none}
+.f-head{fill:var(--limb)} .f-body{fill:var(--kit)}
+.f-stick{stroke:var(--ink);stroke-width:3;stroke-linecap:round}
+.f-red{fill:var(--flag-red)} .f-yel{fill:var(--accent)}
+.f-mark{stroke:var(--accent);stroke-width:3;fill:none;stroke-linecap:round}
+.f-dash{stroke:var(--ink);stroke-width:2.5;fill:none;stroke-dasharray:6 5}
+.f-txt{fill:var(--ink);font:700 15px var(--display);letter-spacing:.08em}
+.f-ground{stroke:var(--line);stroke-width:2}
+.figcol{display:flex;flex-direction:column;gap:8px;min-width:0}
+.replay{align-self:center;font:600 .9rem var(--display);letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;background:transparent;color:var(--muted);border:1.5px solid var(--line);border-radius:3px;cursor:pointer}
+.replay:hover{color:var(--ink);border-color:var(--ink)}
+.f-fade{animation:fade .5s ease-out}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.pitchbox{display:flex;flex-direction:column;gap:4px;max-width:340px}
+.pitchbox svg{display:block;width:100%;height:auto}
+.pitchbox span{font-size:.8rem;color:var(--muted)}
+.p-grass{fill:var(--grass)} .p-line{fill:none;stroke:var(--muted);stroke-width:.6}
+.p-dot{fill:var(--accent);stroke:var(--ink);stroke-width:.7}
+.p-pulse{fill:var(--accent);transform-box:fill-box;transform-origin:center;animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{from{transform:scale(1);opacity:.7}to{transform:scale(3.2);opacity:0}}
+@media (prefers-reduced-motion:reduce){.p-pulse,.f-fade{animation:none}.p-pulse{opacity:0}}
+.live{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.live svg{display:block;width:100%;height:auto}
+.s-a{fill:var(--team-a)} .s-b{fill:var(--team-b)}
+.s-off{fill:var(--accent);stroke:var(--ink);stroke-width:.6}
+.s-ball{fill:var(--ball);stroke:var(--ink);stroke-width:.5}
+.s-ring{fill:none;stroke:var(--ink);stroke-width:.6}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.8rem;color:var(--muted)}
+.legend .replay{margin-left:auto;align-self:center}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.legend .lo{background:var(--accent);border:1.5px solid var(--ink)} .legend .sq{border-radius:1px}
+.legend .lb{background:var(--ball);border:1.5px solid var(--ink)} .legend .la{background:var(--team-a)} .legend .lt{background:var(--team-b)}
+.modes button.match[aria-pressed="false"]{border-color:var(--accent);color:var(--ink)}
+.clock{font-size:1.7rem;font-weight:700;line-height:1}
+.pips i.part{background:linear-gradient(90deg,var(--good) 50%,var(--bad) 50%)}
+.win{height:6px;background:var(--line);border-radius:1px;overflow:hidden}
+.win i{display:block;height:100%;background:var(--accent);transition:width .1s linear}
+.win i.low{background:var(--bad)}
+.rules{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px;max-width:62ch}
+.pick{display:flex;flex-direction:column;gap:6px}
+.pick>span{font:600 .9rem var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{font:500 1rem var(--body);padding:10px 14px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:3px;cursor:pointer}
+.chips button:hover{border-color:var(--ink)}
+.chips button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.why{margin:0;max-width:62ch}
+.t-ok{color:var(--good)} .t-no{color:var(--bad)} .t-part{color:var(--muted)}
+.areas{display:grid;grid-template-columns:auto 1fr auto;gap:8px 12px;align-items:center;font-variant-numeric:tabular-nums}
+.areas .bar{height:8px;background:var(--line);border-radius:1px;min-width:40px}
+.areas .bar i{display:block;height:100%;background:var(--ink);border-radius:1px}
+.review .y{color:var(--muted)}
+@media (max-width:520px){.figcol{align-items:center}.stage{grid-template-columns:1fr}.fig{max-width:220px;margin-inline:auto}h1{font-size:1.7rem}.card{padding:16px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Referee <span>Call Trainer</span></h1>
+    <div class="best" id="best"></div>
+  </header>
+  <div class="modes" role="group" aria-label="Question type">
+    <button id="mode-all" data-mode="all" aria-pressed="true">Mixed</button>
+    <button id="mode-signal" data-mode="signal" aria-pressed="false">Signals</button>
+    <button id="mode-call" data-mode="call" aria-pressed="false">Decisions</button>
+    <button id="mode-match" class="match" data-mode="match" aria-pressed="false">Match mode</button>
+  </div>
+  <div class="status" id="status"></div>
+  <div class="live" id="live" hidden></div>
+  <main class="card" id="card" aria-live="polite"></main>
+  <footer>Based on the IFAB Laws of the Game 2026/27. Figures are simplified sketches, not the official diagrams. Competitions can vary how some Laws apply, so check your own FA's guidance.</footer>
+</div>
+
+<script>
+const REST=[-78,-84];
+const S=[ // signal questions. L = arm on viewer's left, R = viewer's right. Angles: 0 out to the side, 90 up.
+ {who:"Referee",pose:{R:[90,90]},ctx:"The referee has stopped play for an offence and holds this until the kick is taken.",
+  a:"Indirect free kick",d:["Direct free kick","Advantage","Corner kick"],
+  why:"One arm straight up means indirect. The referee keeps it up until the kick is taken and the ball touches another player, goes out of play, or clearly can't be scored directly.",law:"Law 5 and Law 13"},
+ {who:"Referee",pose:{R:[8,8]},ctx:"Whistle for a foul, then the arm goes out towards one end of the pitch.",
+  a:"Direct free kick",d:["Indirect free kick","Goal kick","Play on, no offence"],
+  why:"A level arm pointing in the direction of attack signals a direct free kick for that team.",law:"Law 5"},
+ {who:"Referee",pose:{L:[22,22],R:[22,22]},ctx:"There has been a foul, but there is no whistle and the referee keeps running.",
+  a:"Advantage",d:["Goal disallowed","Indirect free kick","Call for the physio"],
+  why:"Arms swept forward tell everyone the offence was seen and play continues because the fouled team benefits. One arm is also allowed.",law:"Law 5"},
+ {who:"Referee",pose:{R:[-38,-38]},ctx:"Whistle for a foul by a defender inside their own penalty area.",
+  a:"Penalty kick",d:["Corner kick","Indirect free kick","Dropped ball"],
+  why:"The referee points clearly down at the penalty mark.",law:"Law 5 and Law 14"},
+ {who:"Referee",pose:{R:[45,45]},ctx:"The ball has gone out over the goal line, last touched by a defender.",
+  a:"Corner kick",d:["Goal kick","Throw-in","Indirect free kick"],
+  why:"The arm points upward towards the corner arc where the kick will be taken.",law:"Law 5 and Law 17"},
+ {who:"Referee",pose:{L:[-50,150],R:[-50,150]},extra:"tv",ctx:"Play is stopped and the referee draws this shape in the air.",
+  a:"VAR review",d:["Substitution","Drinks break","Goal-line technology check"],
+  why:"The 'TV signal' shows a review is happening, either at the pitchside monitor or on the VAR's advice. It is made again before the final decision.",law:"VAR protocol"},
+ {who:"Referee",pose:{L:[20,157],R:[0,0]},ctx:"Play is stopped. One hand goes to the ear, the other holds players back.",
+  a:"VAR check in progress",d:["Advantage","Player must leave for treatment","Indirect free kick"],
+  why:"A finger to the earpiece with the other arm extended delays the restart while the VAR checks an incident.",law:"VAR protocol"},
+ {who:"Referee",pose:{R:[90,90]},extra:"count",ctx:"The goalkeeper has held the ball for a while. The referee raises a hand and counts on the fingers.",
+  a:"Five-second countdown",d:["Indirect free kick","Five minutes of added time","Fifth substitution"],
+  why:"A raised hand counts down the last five seconds. It started with the goalkeeper's eight-second limit and from 2026/27 is also used for delayed throw-ins and goal kicks.",law:"Laws 12, 15 and 16"},
+ {who:"Assistant referee",pose:{L:[70,95],R:[70,95]},extra:"sub",ctx:"Play has stopped and the assistant faces the pitch.",
+  a:"Substitution requested",d:["Offside","Goal scored","Foul seen"],
+  why:"The flag held level above the head with both hands tells the referee a substitution is waiting.",law:"Law 6"},
+ {who:"Assistant referee",pose:{L:[45,45]},flag:"L",ctx:"The flag went straight up, the referee whistled, and the flag then moved to this angle.",
+  seq:"offside",a:"Offside on the far side of the pitch",d:["Offside in the middle of the pitch","Offside on the near side","Corner kick"],
+  why:"After the whistle the flag shows where the offence was. Angled up means the far side.",law:"Law 6 and Law 11"},
+ {who:"Assistant referee",pose:{L:[0,0]},flag:"L",ctx:"The flag went straight up, the referee whistled, and the flag then dropped level.",
+  seq:"offside",a:"Offside in the middle of the pitch",d:["Offside on the far side","Offside on the near side","Throw-in"],
+  why:"A level flag after the whistle places the offside offence in the middle of the pitch.",law:"Law 6 and Law 11"},
+ {who:"Assistant referee",pose:{L:[-45,-45]},flag:"L",ctx:"The flag went straight up, the referee whistled, and the flag then dropped to this angle.",
+  seq:"offside",a:"Offside on the near side of the pitch",d:["Offside on the far side","Offside in the middle of the pitch","Substitution"],
+  why:"Angled down means the offence was on the assistant's own side of the pitch.",law:"Law 6 and Law 11"},
+ {who:"Assistant referee",pose:{R:[45,45]},flag:"R",ctx:"The ball has just gone out over the touchline.",
+  a:"Throw-in, to the team attacking the way the flag points",d:["Offside on the far side","Corner kick","Substitution"],
+  why:"For a throw-in the flag is raised at an angle along the touchline in the direction the awarded team is attacking.",law:"Law 6 and Law 15"},
+ {who:"Assistant referee",pose:{L:[-45,-45]},flag:"L",ctx:"The ball has gone out over the goal line, last touched by a defender. The assistant is by the corner flag.",
+  a:"Corner kick",d:["Goal kick","Offside on the far side","Penalty kick"],
+  why:"The flag points down at the corner arc on the assistant's side.",law:"Law 6 and Law 17"},
+ {who:"Assistant referee",pose:{L:[90,90]},flag:"L",extra:"wave",ctx:"Play is live. The assistant raises the flag and moves it gently back and forth.",
+  a:"Foul or misconduct seen by the assistant",d:["Offside","Ball out for a throw-in","Substitution"],
+  why:"A raised flag with a slight wave tells the referee the assistant has seen an offence. The flag then points the direction of the free kick.",law:"Law 6"}
+];
+const C=[ // decision questions
+ {min:71,at:[8,32],cat:"Restarts",w:1,q:"The goalkeeper has the ball in their hands and is still holding it after the referee's countdown reaches zero, more than eight seconds in total. What is the decision?",
+  a:"Corner kick to the opposing team",d:["Indirect free kick to the opposing team","Yellow card and indirect free kick","Dropped ball to the goalkeeper"],
+  why:"Since 2025/26 a keeper who holds the ball longer than eight seconds concedes a corner, not an indirect free kick. There is no card unless it keeps happening.",law:"Law 12"},
+ {min:84,at:[60,0.8],cat:"Restarts",w:1,q:"A team that is winning takes too long over a throw-in. The referee starts the visual countdown and the ball is still not in play when it ends. What happens?",
+  a:"Throw-in to the opposing team",d:["Indirect free kick to the opposing team","Yellow card and the same team throws","Corner kick to the opposing team"],
+  why:"New for 2026/27: if the five-second countdown runs out, the throw-in goes to the other team.",law:"Law 15"},
+ {min:88,at:[5,30],cat:"Restarts",w:1,q:"A goalkeeper delays a goal kick. The referee counts down five seconds and the kick has still not been taken. What is the restart?",
+  a:"Corner kick to the opposing team",d:["Goal kick retaken after a yellow card","Indirect free kick on the goal-area line","Dropped ball"],
+  why:"New for 2026/27: a goal kick not taken before the countdown ends becomes a corner for the opponents.",law:"Law 16"},
+ {min:79,at:[50,0.8],cat:"Players and procedure",w:1,q:"The board goes up for a substitution. The player coming off walks slowly and takes well over ten seconds to leave. What happens with the substitute?",
+  a:"The substitute must wait until the first stoppage after one minute of play",d:["The substitute comes on straight away and time is added","The substitution is cancelled","The player coming off is sent off"],
+  why:"From 2026/27 a player has ten seconds to leave. If they don't, they still go off, but the team plays short until the first stoppage after a minute has passed.",law:"Law 3"},
+ {min:34,at:[90,28],cat:"Fouls and cards",w:2,two:{r:"Penalty kick",s:"Yellow card"},q:"A defender slides in to win the ball inside their own penalty area, mistimes it and brings down an attacker who had an obvious goal-scoring opportunity. What do you give?",
+  a:"Penalty kick and a yellow card",d:["Penalty kick and a red card","Penalty kick, no card","Indirect free kick and a yellow card"],
+  why:"When a penalty is awarded and the foul was a genuine attempt to play the ball, denying an obvious goal-scoring opportunity is a caution, not a sending-off.",law:"Law 12"},
+ {min:52,at:[88,37],cat:"Fouls and cards",w:2,two:{r:"Penalty kick",s:"Red card"},q:"An attacker is through on goal inside the penalty area. The last defender grabs their shirt and pulls them back. What do you give?",
+  a:"Penalty kick and a red card",d:["Penalty kick and a yellow card","Penalty kick, no card","Direct free kick outside the area and a red card"],
+  why:"Holding, pulling and pushing are not attempts to play the ball, so the reduced sanction does not apply. It is a sending-off for denying an obvious goal-scoring opportunity.",law:"Law 12"},
+ {min:18,at:[70,30],cat:"Fouls and cards",w:2,q:"A defender fouls an attacker to deny an obvious goal-scoring opportunity. You play advantage and the attacking team scores. What happens to the defender?",
+  a:"No card",d:["Yellow card","Red card","Red card and the goal is disallowed"],
+  why:"Changed for 2026/27. The defender used to be cautioned here. Now, if advantage is played and a goal is scored, there is no caution for the opportunity-denying offence.",law:"Law 12"},
+ {min:63,at:[94,34],cat:"Fouls and cards",w:2,q:"A cross accidentally strikes an attacker's arm. The ball drops at her feet and she scores immediately. What is the decision?",
+  a:"No goal, direct free kick to the defending team",d:["Goal stands","No goal, indirect free kick to the defending team","No goal, yellow card for the attacker"],
+  why:"A player cannot score directly from, or immediately after, the ball touching their own hand or arm, even by accident. It is a handball offence with no card.",law:"Law 12"},
+ {min:90,at:[94,34],cat:"Penalties",w:2,q:"A penalty taker slips and accidentally kicks the ball against their own standing foot. The ball goes into the goal. What is the decision?",
+  a:"Retake the penalty",d:["Goal stands","Indirect free kick to the defending team","Goal kick"],
+  why:"An accidental double touch that ends in a goal means a retake. If the ball had not gone in, it would be an indirect free kick to the defenders, or a missed kick in a shoot-out.",law:"Law 14"},
+ {min:40,at:[40,46],cat:"Players and procedure",w:1,q:"An outfield player goes down with cramp. There was no foul. The physio comes on and treats them on the pitch. When can the player return?",
+  a:"One minute after play has restarted",d:["As soon as play restarts","Immediately, before the restart","At the next stoppage in play"],
+  why:"From 2026/27 a player treated on the field must leave and stay off for one minute after the restart. Goalkeepers, head injuries and a few other cases are exempt.",law:"Law 5"},
+ {min:57,at:[56,20],cat:"VAR",w:2,q:"In a match with VAR, you show a player a second yellow card and send them off. Replays show clearly that there was no contact at all. Can the VAR step in?",
+  a:"Yes, a clearly incorrect second yellow can be reviewed",d:["No, yellow cards are never reviewable","Only if the team's captain asks","Only after the match, on appeal"],
+  why:"New for 2026/27. A red card that comes from a clearly incorrect second caution is now reviewable. A first yellow card on its own still is not.",law:"VAR protocol"},
+ {min:26,at:[7,35],cat:"Fouls and cards",w:1,two:{r:"Indirect free kick",s:"No card"},q:"A defender deliberately kicks the ball back to their own goalkeeper, who picks it up inside the penalty area. What is the decision?",
+  a:"Indirect free kick to the attacking team, no card",d:["Penalty kick","Indirect free kick and a yellow card","Play on"],
+  why:"A keeper may not handle a deliberate kick from a team-mate. It is an indirect free kick where the keeper handled it, with no disciplinary sanction.",law:"Law 12"},
+ {min:12,at:[76,24],cat:"Restarts",w:2,q:"An indirect free kick is struck straight into the opponents' goal without touching anyone. What is the restart?",
+  a:"Goal kick",d:["Goal","Retake the free kick","Corner kick"],
+  why:"A goal cannot be scored directly from an indirect free kick. Into the opponents' goal it is a goal kick. Into the kicker's own goal it would be a corner.",law:"Law 13"},
+ {min:45,at:[86,67.2],cat:"Restarts",w:2,q:"A long throw-in flies straight into the opponents' goal without touching any player. What is the restart?",
+  a:"Goal kick",d:["Goal","Retake the throw-in","Corner kick"],
+  why:"A goal cannot be scored directly from a throw-in. It is a goal kick if it enters the opponents' goal and a corner if it enters the thrower's own.",law:"Law 15"},
+ {min:67,at:[80,0.8],cat:"Offside",w:2,q:"An attacker standing in an offside position receives the ball directly from a team-mate's throw-in and scores. What is the decision?",
+  a:"Goal",d:["Offside, indirect free kick","Retake the throw-in","Goal kick"],
+  why:"There is no offside offence when a player receives the ball directly from a throw-in, a goal kick or a corner kick.",law:"Law 11"}
+ ,{min:23,at:[48,40],cat:"Fouls and cards",w:1,two:{r:"Direct free kick",s:"Yellow card"},q:"A midfielder slides in late and catches an opponent on the ankle after the ball has gone. It is reckless, but not with excessive force. What do you give?",
+  a:"Direct free kick and a yellow card",d:["Direct free kick, no card","Direct free kick and a red card","Indirect free kick and a yellow card"],
+  why:"A reckless challenge shows disregard for the danger to an opponent and must be cautioned. Careless means no card. Excessive force means a red.",law:"Law 12"},
+ {min:31,at:[55,25],cat:"Fouls and cards",w:2,two:{r:"Direct free kick",s:"Red card"},q:"A player jumps into a tackle at speed with both feet off the ground and studs showing, and makes contact above the opponent's ankle. What do you give?",
+  a:"Direct free kick and a red card",d:["Direct free kick and a yellow card","Direct free kick, no card","Indirect free kick and a red card"],
+  why:"A challenge that endangers an opponent's safety or uses excessive force is serious foul play, which is a sending-off.",law:"Law 12"},
+ {min:58,at:[50,12],cat:"Fouls and cards",w:1,two:{r:"Direct free kick",s:"Yellow card"},q:"A winger breaks on a counter-attack near the halfway line with team-mates in support. A defender pulls their shirt to stop the move. Covering defenders mean it is not an obvious goal-scoring opportunity. What do you give?",
+  a:"Direct free kick and a yellow card",d:["Direct free kick, no card","Direct free kick and a red card","Play on"],
+  why:"A foul that stops a promising attack is a caution. Because it was holding, there is no reduced sanction.",law:"Law 12"},
+ {min:36,at:[92,40],cat:"Fouls and cards",w:2,two:{r:"Penalty kick",s:"No card"},q:"Inside the penalty area a defender stretches for the ball, misses it and trips an attacker. It stops a promising attack, but covering defenders mean it is not an obvious goal-scoring opportunity. What do you give?",
+  a:"Penalty kick, no card",d:["Penalty kick and a yellow card","Penalty kick and a red card","Indirect free kick, no card"],
+  why:"When a penalty is awarded for a foul that was an attempt to play the ball, stopping a promising attack is not cautioned.",law:"Law 12"},
+ {min:74,at:[104,33],cat:"Fouls and cards",w:2,two:{r:"Penalty kick",s:"Red card"},q:"A shot is going into the goal. A defender on the goal line dives and punches the ball away with a fist. What do you give?",
+  a:"Penalty kick and a red card",d:["Penalty kick and a yellow card","Penalty kick, no card","Goal"],
+  why:"Deliberately handling the ball to deny a goal is a sending-off, even when a penalty is awarded.",law:"Law 12"},
+ {min:49,at:[103,36],cat:"Fouls and cards",w:2,two:{r:"Penalty kick",s:"Yellow card"},q:"A shot heading into the goal strikes a defender's arm, which is held out from the body and makes them bigger. It is a handball offence but clearly not deliberate. What do you give?",
+  a:"Penalty kick and a yellow card",d:["Penalty kick and a red card","Penalty kick, no card","Play on"],
+  why:"A non-deliberate handball that denies a goal and results in a penalty is treated like a foul that was an attempt to play the ball: a caution, not a sending-off.",law:"Law 12"},
+ {min:15,at:[30,30],cat:"Fouls and cards",w:1,two:{r:"Indirect free kick",s:"No card"},q:"A defender raises a boot to head height to clear the ball as an opponent stoops to head it. There is no contact, but the opponent pulls out for fear of injury. What do you give?",
+  a:"Indirect free kick, no card",d:["Direct free kick, no card","Direct free kick and a yellow card","Play on"],
+  why:"Playing in a dangerous manner without contact is an indirect free kick. With contact it would become a direct free kick.",law:"Law 12"},
+ {min:42,at:[72,44],cat:"Fouls and cards",w:1,two:{r:"Indirect free kick",s:"No card"},q:"The ball is well out of playing distance. A defender steps across an attacker's path and blocks their run without touching them. What do you give?",
+  a:"Indirect free kick, no card",d:["Direct free kick, no card","Play on","Direct free kick and a yellow card"],
+  why:"Impeding the progress of an opponent without contact is an indirect free kick. Impeding with contact is a direct free kick.",law:"Law 12"},
+ {min:66,at:[19,34],cat:"Fouls and cards",w:2,two:{r:"Direct free kick",s:"Red card"},q:"An attacker is about to run onto a through ball with an empty goal ahead. The goalkeeper rushes out and deliberately handles the ball just outside the penalty area. What do you give?",
+  a:"Direct free kick and a red card",d:["Direct free kick and a yellow card","Penalty kick and a red card","Indirect free kick and a yellow card"],
+  why:"Outside the penalty area the goalkeeper is treated like any other player. A deliberate handball that denies an obvious goal-scoring opportunity is a sending-off.",law:"Law 12"},
+ {min:55,at:[35,3],cat:"Fouls and cards",w:1,two:{r:"Indirect free kick",s:"Yellow card"},q:"While the ball is in play, a player runs towards you shouting and waving their arms to dispute a throw-in decision. You stop play to deal with it. What do you give?",
+  a:"Indirect free kick and a yellow card",d:["Direct free kick and a yellow card","Dropped ball and a yellow card","Indirect free kick and a red card"],
+  why:"Dissent by word or action is a caution. When play is stopped for a verbal offence the restart is an indirect free kick.",law:"Law 12"},
+ {min:81,at:[90,30],cat:"Fouls and cards",w:2,two:{r:"Indirect free kick",s:"Yellow card"},q:"An attacker throws themselves to the ground in the penalty area with no contact from any defender, clearly trying to win a penalty. You stop play. What do you give?",
+  a:"Indirect free kick to the defending team and a yellow card",d:["Penalty kick","Play on, no action","Direct free kick to the defending team and a red card"],
+  why:"Attempting to deceive the referee by simulation is unsporting behaviour. It is a caution and an indirect free kick.",law:"Law 12"},
+ {min:28,at:[98,30],cat:"Fouls and cards",w:1,q:"A player scores and pulls their shirt off in celebration. What is the decision?",
+  a:"Goal stands, yellow card for the scorer",d:["Goal stands, no action","Goal disallowed, yellow card","Goal stands, a warning only"],
+  why:"Removing the shirt, or covering the head with it, in celebration is a mandatory caution. The goal is not affected.",law:"Law 12"},
+ {min:77,at:[60,50],cat:"Fouls and cards",w:2,two:{r:"Direct free kick",s:"Red card"},q:"While the ball is in play, a player spits at an opponent standing next to them. What do you give?",
+  a:"Direct free kick and a red card",d:["Indirect free kick and a red card","Direct free kick and a yellow card","Dropped ball and a red card"],
+  why:"Biting or spitting at someone is a sending-off offence, and against an opponent it is penalised with a direct free kick.",law:"Law 12"},
+ {min:20,at:[10,34],cat:"Fouls and cards",w:1,two:{r:"Indirect free kick",s:"No card"},q:"The goalkeeper rolls the ball out, changes their mind and picks it up again inside the penalty area before any other player has touched it. What do you give?",
+  a:"Indirect free kick, no card",d:["Play on","Penalty kick","Indirect free kick and a yellow card"],
+  why:"A goalkeeper may not touch the ball with the hands again after releasing it until another player has touched it.",law:"Law 12"},
+ {min:62,at:[65,20],cat:"Fouls and cards",w:1,q:"A defender commits a reckless foul. You play advantage, the attack continues and ends with a shot that goes out for a goal kick. What now?",
+  a:"Yellow card for the defender, then the goal kick",d:["No card, because advantage was played","Go back for the free kick and show a yellow card","Red card for the defender, then the goal kick"],
+  why:"Playing advantage does not cancel the card. A reckless foul is cautioned at the next stoppage, and play restarts for whatever caused that stoppage.",law:"Law 5 and Law 12"},
+ {min:38,at:[70,30],cat:"Offside",w:1,q:"A defender under no pressure deliberately plays a pass with full control but misdirects it straight to an attacker who was in an offside position. What is the decision?",
+  a:"Play on",d:["Offside, indirect free kick","Dropped ball","Offside, direct free kick"],
+  why:"An attacker who receives the ball from an opponent's deliberate play is not penalised for offside. A deliberate save does not count as deliberate play.",law:"Law 11"},
+ {min:53,at:[97,38],cat:"Offside",w:2,q:"A shot is saved by the goalkeeper and rebounds to an attacker who was in an offside position when the shot was taken. They score. What is the decision?",
+  a:"No goal, offside",d:["Goal","No goal, corner kick","No goal, dropped ball"],
+  why:"A player in an offside position who plays a ball that rebounds or is saved by an opponent has gained an advantage and is penalised.",law:"Law 11"},
+ {min:9,at:[80,30],cat:"Offside",w:1,q:"At the moment a through ball is played, the attacker is exactly level with the second-last defender. They run on and collect the pass. What is the decision?",
+  a:"Play on",d:["Offside, indirect free kick","Offside, direct free kick","Dropped ball"],
+  why:"A player level with the second-last opponent is not in an offside position.",law:"Law 11"},
+ {min:70,at:[96,30],cat:"Offside",w:2,q:"A team-mate shoots from distance and scores. An attacker in an offside position was standing right in front of the goalkeeper, clearly blocking their view of the shot. What is the decision?",
+  a:"No goal, offside",d:["Goal, the attacker did not touch the ball","No goal, direct free kick","No goal, yellow card for the attacker"],
+  why:"Clearly obstructing an opponent's line of vision from an offside position is interfering with an opponent, which is an offside offence.",law:"Law 11"},
+ {min:44,at:[46,40],cat:"Offside",w:1,q:"An attacker is in an offside position in the opponents' half when the ball is played, then runs back into their own half and receives it there. Where is the free kick taken?",
+  a:"Where the attacker received the ball, in their own half",d:["Where the attacker stood when the ball was played","On the halfway line","There is no offence in a player's own half"],
+  why:"The indirect free kick is taken where the offence occurred, which is where the player became involved, even if that is in their own half.",law:"Law 11"},
+ {min:17,at:[104,1],cat:"Restarts",w:2,q:"A corner kick curls straight into the opponents' goal without touching anyone. What is the decision?",
+  a:"Goal",d:["Goal kick","Retake the corner","Indirect free kick to the defending team"],
+  why:"A goal may be scored directly from a corner kick, but only against the opposing team.",law:"Law 17"},
+ {min:86,at:[5,30],cat:"Restarts",w:2,q:"In a gale, a goal kick is taken correctly, but the wind carries the ball straight back into the kicker's own goal untouched. What is the restart?",
+  a:"Corner kick to the opposing team",d:["Goal to the opposing team","Retake the goal kick","Dropped ball"],
+  why:"A team cannot score directly against itself from a goal kick. If the ball goes straight into the kicker's own goal, it is a corner.",law:"Law 16"},
+ {min:33,at:[78,34],cat:"Restarts",w:1,q:"A direct free kick hits the post and rebounds to the kicker, who shoots again before anyone else has touched the ball. What is the decision?",
+  a:"Indirect free kick to the opposing team",d:["Play on","Retake the free kick","Direct free kick to the opposing team"],
+  why:"The kicker must not touch the ball again until it has touched another player. The post does not count.",law:"Law 13"},
+ {min:11,at:[40,0.8],cat:"Restarts",w:1,q:"A player takes a throw-in with one foot clearly lifted off the ground as the ball is released. What is the decision?",
+  a:"Throw-in to the opposing team",d:["Retake the throw-in","Indirect free kick to the opposing team","Play on"],
+  why:"The thrower must have part of each foot on or behind the touchline, on the ground. An incorrect throw goes to the opponents.",law:"Law 15"},
+ {min:47,at:[8,30],cat:"Restarts",w:1,q:"You stop play for a serious injury. The ball was inside the defending team's penalty area at that moment and there was no offence. How do you restart?",
+  a:"Dropped ball to the defending goalkeeper",d:["Dropped ball to the team that last touched it","Indirect free kick to the defending team","Contested dropped ball"],
+  why:"If play is stopped with the ball in the penalty area, the ball is dropped for the defending team's goalkeeper in that area.",law:"Law 8"},
+ {min:60,at:[68,26],cat:"Restarts",w:1,q:"An attacker takes a quick free kick. An opponent only five metres away, who had not had time to retreat, intercepts the ball. What is the decision?",
+  a:"Play on",d:["Retake the free kick","Retake and a yellow card for the opponent","Indirect free kick to the attacking team"],
+  why:"If a team chooses to take a free kick quickly and an opponent closer than 9.15 m intercepts it, play continues.",law:"Law 13"},
+ {min:25,at:[82,34],cat:"Restarts",w:1,q:"The defending team forms a wall of four players. As the free kick is taken, an attacker is standing right beside the wall, less than a metre from it. What is the decision?",
+  a:"Indirect free kick to the defending team",d:["Retake the free kick","Play on","Yellow card for the attacker and a retake"],
+  why:"When three or more defenders form a wall, attackers must be at least 1 m from it until the ball is in play.",law:"Law 13"},
+ {min:5,at:[62,67.4],cat:"Restarts",w:1,q:"The ball rolls along the touchline. Most of it is over the line, but part of the ball still overhangs it. What is the decision?",
+  a:"Play on, the ball is still in play",d:["Throw-in","Throw-in once the centre of the ball has crossed","Dropped ball"],
+  why:"The ball is only out of play when the whole of it has passed over the line, on the ground or in the air.",law:"Law 9"},
+ {min:69,at:[94,34],cat:"Penalties",w:2,q:"At a penalty, the goalkeeper comes well off the line with both feet before the kick is taken and saves it. It is the keeper's first such offence. What is the decision?",
+  a:"Retake the penalty and warn the goalkeeper",d:["Retake the penalty and caution the goalkeeper","Play on, the save stands","Indirect free kick to the attacking team"],
+  why:"If the goalkeeper offends and the kick is saved, it is retaken. The keeper is warned the first time and cautioned for any further offence.",law:"Law 14"},
+ {min:83,at:[92,30],cat:"Penalties",w:2,q:"A penalty is saved. A team-mate of the kicker, who had run into the penalty area before the kick was taken, reaches the rebound first and scores. What is the decision?",
+  a:"No goal, indirect free kick to the defending team",d:["Goal","Retake the penalty","Goal kick"],
+  why:"Encroachment by a team-mate of the kicker is penalised when that player goes on to play the ball and score. As the kick itself did not score, it is an indirect free kick.",law:"Law 14"},
+ {min:90,at:[94,34],cat:"Penalties",w:2,two:{r:"Indirect free kick",s:"Yellow card"},q:"A penalty taker completes the run-up, stops dead, feints to kick to send the goalkeeper the wrong way, then scores. What do you give?",
+  a:"Indirect free kick to the defending team and a yellow card",d:["Goal","Retake the penalty and a yellow card","Retake the penalty, no card"],
+  why:"Feinting during the run-up is allowed. Feinting to kick once the run-up is complete is not: the kicker is cautioned and the defenders get an indirect free kick, whether or not the ball went in.",law:"Law 14"},
+ {min:64,at:[52,34],cat:"Players and procedure",w:2,q:"A team scores. Before the restart you realise a substitute from the scoring team had come onto the pitch without permission and was on it when the goal went in. What is the decision?",
+  a:"No goal, direct free kick from where the substitute was",d:["Goal stands, yellow card for the substitute","No goal, dropped ball","No goal, goal kick"],
+  why:"If an extra person from the scoring team was on the field when the goal was scored, it is disallowed and play restarts with a direct free kick from that person's position.",law:"Law 3"},
+ {min:51,at:[95,36],cat:"Players and procedure",w:2,q:"An attacker's boot comes off accidentally in a challenge. Seconds later, still without it, they score. What is the decision?",
+  a:"Goal",d:["No goal, indirect free kick","No goal, dropped ball","Goal, and a yellow card"],
+  why:"A player who loses footwear or a shinguard accidentally must replace it no later than the next time the ball goes out of play. A goal scored before then counts.",law:"Law 4"},
+ {min:85,at:[52,34],cat:"Players and procedure",w:1,q:"After two red cards and several injuries with no substitutes left, one team is down to six players. What happens?",
+  a:"The match cannot continue",d:["Play continues as long as there is a goalkeeper","Play continues until they have five players","The other team must also remove a player"],
+  why:"A match may not start or continue if either team has fewer than seven players.",law:"Law 3"},
+ {min:59,at:[45,0.8],cat:"Players and procedure",w:1,q:"Someone in a team's technical area shouts abuse at you, but you cannot tell who it was. Who receives the sanction?",
+  a:"The senior team coach present in the technical area",d:["Nobody, without identifying the offender","The team captain on the pitch","Every person in the technical area"],
+  why:"When an offender in the technical area cannot be identified, the senior coach present receives the sanction.",law:"Law 12"},
+ {min:45,at:[90,30],cat:"Players and procedure",w:2,q:"You award a penalty kick just as the time for the first half runs out. What do you do?",
+  a:"Allow extra time for the penalty to be taken and completed",d:["End the half; the penalty is not taken","Take the penalty at the start of the second half","Allow the penalty and one minute of open play afterwards"],
+  why:"Time is extended for a penalty kick to be taken and completed at the end of each half. The half ends when the kick is completed.",law:"Law 7 and Law 14"}
+];
+S.forEach(x=>{x.t="signal";x.cat="Signals";x.w=1;}); C.forEach(x=>x.t="call");
+
+function pt(x,y,a,len,mir){const r=a*Math.PI/180;return [x+(mir?-1:1)*len*Math.cos(r), y-len*Math.sin(r)];}
+function arm(side,ang){
+  const mir=side==="L", s=mir?[98,84]:[142,84];
+  const e=pt(s[0],s[1],ang[0],34,mir), h=pt(e[0],e[1],ang[1],32,mir);
+  return {d:`M${s[0]} ${s[1]} L${e[0].toFixed(1)} ${e[1].toFixed(1)} L${h[0].toFixed(1)} ${h[1].toFixed(1)}`,h,a:ang[1],mir};
+}
+function figure(q,pose,o){
+  o=o||{final:true}; const p=pose||q.pose, L=arm("L",p.L||REST), R=arm("R",p.R||REST);
+  let x="";
+  if(q.flag){const A=q.flag==="L"?L:R;
+    x+=`<g transform="translate(${A.h[0].toFixed(1)} ${A.h[1].toFixed(1)})${A.mir?" scale(-1 1)":""} rotate(${-A.a})"><line class="f-stick" x1="-5" y1="0" x2="46" y2="0"/><rect class="f-red" x="20" y="-22" width="13" height="11"/><rect class="f-yel" x="33" y="-22" width="13" height="11"/><rect class="f-yel" x="20" y="-11" width="13" height="11"/><rect class="f-red" x="33" y="-11" width="13" height="11"/></g>`;}
+  if(q.extra==="sub"){const y=L.h[1];
+    x+=`<line class="f-stick" x1="76" y1="${y}" x2="164" y2="${y}"/><rect class="f-red" x="100" y="${y-16}" width="20" height="8"/><rect class="f-yel" x="120" y="${y-16}" width="20" height="8"/><rect class="f-yel" x="100" y="${y-8}" width="20" height="8"/><rect class="f-red" x="120" y="${y-8}" width="20" height="8"/>`;}
+  if(q.extra==="tv"&&o.final) x+=`<rect class="f-dash f-fade" x="92" y="92" width="56" height="36"/>`;
+  if(q.extra==="wave"&&(o.final||o.wave)) x+=`<path class="f-mark" d="M44 14 q-10 10 -4 24"/><path class="f-mark" d="M112 14 q10 10 4 24"/>`;
+  if(q.extra==="count"&&(o.final||o.count)){const h=R.h; let f="";
+    for(let i=-2;i<=2;i++) f+=`<line class="f-limb" style="stroke-width:3" x1="${h[0]+i*3}" y1="${h[1]-3}" x2="${h[0]+i*6}" y2="${h[1]-14}"/>`;
+    x+=f+(o.count?`<text class="f-txt" style="font-size:36px" x="178" y="46">${o.count}</text>`:`<text class="f-txt" x="168" y="34">5 4 3 2 1</text>`);}
+  return `<svg viewBox="0 0 240 232" role="img" aria-label="${q.who} signal sketch"><line class="f-ground" x1="40" y1="222" x2="200" y2="222"/><path class="f-leg" d="M110 150 L104 216"/><path class="f-leg" d="M130 150 L136 216"/><rect class="f-body" x="96" y="74" width="48" height="84" rx="10"/><circle class="f-head" cx="120" cy="52" r="16"/><path class="f-limb" d="${L.d}"/><path class="f-limb" d="${R.d}"/>${x}</svg>`;
+}
+
+function pitch(q){const [x,y]=q.at;
+  return `<div class="pitchbox"><svg viewBox="-2 -2 109 72" role="img" aria-label="Pitch diagram marking where the incident happened"><rect class="p-grass" x="0" y="0" width="105" height="68"/><g class="p-line"><rect x="0" y="0" width="105" height="68"/><line x1="52.5" y1="0" x2="52.5" y2="68"/><circle cx="52.5" cy="34" r="9.15"/><rect x="0" y="13.85" width="16.5" height="40.3"/><rect x="88.5" y="13.85" width="16.5" height="40.3"/><rect x="0" y="24.85" width="5.5" height="18.3"/><rect x="99.5" y="24.85" width="5.5" height="18.3"/></g><circle class="p-pulse" cx="${x}" cy="${y}" r="2.4"/><circle class="p-dot" cx="${x}" cy="${y}" r="2.4"/></svg><span>Where it happened</span></div>`;}
+let animTok=0;
+function play(q){
+  const el=document.querySelector(".fig"); if(!el)return;
+  const tok=++animTok;
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches){el.innerHTML=figure(q);return;}
+  const full=p=>({L:p.L||REST,R:p.R||REST}), end=full(q.pose);
+  let ks;
+  if(q.seq==="offside") ks=[{p:full({L:[90,90]}),d:450,hold:800},{p:end,d:450}];
+  else if(q.extra==="wave"){ks=[{p:end,d:450}];for(let i=0;i<3;i++)ks.push({p:full({L:[102,102]}),d:220,wave:1},{p:full({L:[78,78]}),d:220,wave:1});ks.push({p:end,d:200,wave:1});}
+  else if(q.extra==="count"){ks=[{p:end,d:450}];for(let n=5;n>=1;n--)ks.push({p:end,d:0,hold:650,count:n});}
+  else ks=[{p:end,d:650}];
+  let from=full({}),i=0,t0=null;
+  function step(ts){
+    if(tok!==animTok||!el.isConnected)return;
+    const k=ks[i]; if(t0===null)t0=ts;
+    const e=ts-t0; let u=k.d?Math.min(1,e/k.d):1; u=u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+    const mix=(a,b)=>[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u];
+    el.innerHTML=figure(q,{L:mix(from.L,k.p.L),R:mix(from.R,k.p.R)},{wave:k.wave,count:k.count});
+    if(e>=k.d+(k.hold||0)){from=k.p;i++;t0=null;if(i>=ks.length){el.innerHTML=figure(q);return;}}
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+const $=id=>document.getElementById(id), N=10;
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+let mode="all", round=[], idx=0, results=[], picked=null;
+function getBest(){try{return JSON.parse(localStorage.getItem("rct-best")||"{}");}catch(e){return {};}}
+function setBest(b){try{localStorage.setItem("rct-best",JSON.stringify(b));}catch(e){}}
+function showBest(){if(mode==="match"){const m=getBest().match;$("best").textContent=m!=null?`Your best match accuracy: ${m}%`:"";return;}
+  const b=getBest()[mode];$("best").textContent=b!=null?`Your best on this set: ${b}/${N}`:"";}
+function start(){
+  $("live").hidden=true;
+  const pool=mode==="signal"?shuffle(S):mode==="call"?shuffle(C):shuffle(shuffle(S).slice(0,N/2).concat(shuffle(C).slice(0,N/2)));
+  round=pool.slice(0,N).map(q=>({q,opts:shuffle([q.a].concat(q.d))}));
+  idx=0;results=[];picked=null;showBest();render();
+}
+function status(){
+  const score=results.filter(r=>r.ok).length;
+  const pips=round.map((_,i)=>`<i class="${i<results.length?(results[i].ok?"ok":"no"):(i===idx?"now":"")}"></i>`).join("");
+  $("status").innerHTML=`<span>Q ${Math.min(idx+1,N)}/${N}</span><span class="pips" aria-hidden="true">${pips}</span><span>Score ${score}</span>`;
+}
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+function render(){
+  status();
+  if(idx>=N) return finish();
+  const {q,opts}=round[idx], done=picked!==null;
+  const btns=opts.map((o,i)=>{
+    let c=""; if(done){ if(o===q.a)c="right"; else if(o===picked)c="wrong"; }
+    return `<button id="opt-${i}" data-o="${i}" class="${c}" ${done?"disabled":""}><em>${"ABCD"[i]}</em><span>${esc(o)}</span></button>`;}).join("");
+  const fb=done?`<div class="fb"><p><strong class="${picked===q.a?"ok":"no"}">${picked===q.a?"Correct.":"Not this time. The answer is "+esc(q.a)+"."}</strong> ${esc(q.why)}</p><div class="law">${q.law}</div><button class="go" id="next">${idx===N-1?"See result":"Next question"}</button></div>`:"";
+  let body;
+  if(q.t==="signal"){
+    body=`<div class="kind"><b>${q.who}</b>Name the signal</div><p class="ctx">${esc(q.ctx)}</p><div class="stage"><div class="figcol"><div class="fig">${done?figure(q):figure(q,{L:REST,R:REST},{})}</div><button class="replay" id="replay">Replay signal</button></div><div class="opts">${btns}</div></div>`;
+  }else{
+    body=`<div class="kind"><b>${q.min}'</b>Make the call</div><p class="q">${esc(q.q)}</p>${pitch(q)}<div class="opts">${btns}</div>`;
+  }
+  animTok++;
+  $("card").innerHTML=body+fb;
+  if(q.t==="signal"&&!done) play(q);
+  if(done) $("next").focus();
+}
+function finish(){
+  const score=results.filter(r=>r.ok).length, b=getBest();
+  if(b[mode]==null||score>b[mode]){b[mode]=score;setBest(b);}
+  showBest();
+  const verdict=score===N?"A clean sheet. Every call right.":score>=8?"Strong control of the match. Tidy up the ones below.":score>=5?"A mixed game. Go back over the misses and play again.":"A tough match. Read through the answers below, then try another round.";
+  const miss=results.map((r,i)=>r.ok?"":`<li><div>${esc(round[i].q.t==="signal"?round[i].q.who+": "+round[i].q.ctx:round[i].q.q)}</div><div class="a">${esc(round[i].q.a)}</div><div class="law">${round[i].q.law}</div></li>`).join("");
+  $("card").innerHTML=`<div class="kind"><b>FT</b>Full time</div><div class="total">${score}<small> / ${N}</small></div><p class="q">${verdict}</p>${miss?`<ul class="review">${miss}</ul>`:""}<button class="go" id="again">Play another round</button>`;
+  $("again").focus();
+}
+$("card").addEventListener("click",e=>{
+  if(mode==="match"){matchClick(e);return;}
+  const o=e.target.closest("[data-o]");
+  if(o&&picked===null){const {q,opts}=round[idx];picked=opts[+o.dataset.o];results.push({ok:picked===q.a});render();return;}
+  if(e.target.id==="next"){idx++;picked=null;render();}
+  if(e.target.id==="again")start();
+  if(e.target.id==="replay")play(round[idx].q);
+});
+document.querySelector(".modes").addEventListener("click",e=>{
+  const b=e.target.closest("[data-mode]");if(!b)return;
+  mode=b.dataset.mode;
+  document.querySelectorAll(".modes button").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  stopTick();
+  if(mode==="match")startMatch();else start();
+});
+
+/* ---- Match mode: 600 real seconds stand for 90 match minutes ---- */
+const WIN=15, HALF=300, FIRST=13, RS=["Play on","Direct free kick","Indirect free kick","Penalty kick"], SS=["No card","Yellow card","Red card"];
+const M={state:"pre",t:0,inc:[],i:0,res:[],h2:false,fb:null,sel:{},timer:null,last:0,deadline:0};
+function stopTick(){cancelAnimationFrame(M.timer);M.timer=null;}
+function startTick(){stopTick();M.last=performance.now();const loop=()=>{M.timer=requestAnimationFrame(loop);tick();};M.timer=requestAnimationFrame(loop);}
+function startMatch(){
+  stopTick();
+  const list=shuffle(shuffle(S).slice(0,4).concat(shuffle(C).slice(0,21)));
+  M.inc=list.map((q,k)=>({q,opts:shuffle([q.a].concat(q.d)),at:k<FIRST?6+k*22.5:HALF+8+(k-FIRST)*24}));
+  Object.assign(M,{state:"pre",t:0,i:0,res:[],h2:false,fb:null,sel:{}});
+  simReset();
+  showBest();renderMatch();
+}
+function tick(){
+  const now=performance.now(), dt=Math.min(.25,(now-M.last)/1000); M.last=now;
+  if(M.state!=="ask"&&M.state!=="wait")return;
+  M.t+=dt;
+  if(!RED){ if(M.state==="wait")simStep(dt); else simBodies(dt); }
+  advance(); paintClock(); simDraw();
+}
+function advance(){
+  if(M.state==="ask"){ if(M.t>=M.deadline) answer(null); return; }
+  if(M.state!=="wait")return;
+  if(!M.h2&&M.i>=FIRST){ if(M.t>=HALF){M.t=HALF;M.state="ht";renderMatch();} return; }
+  if(M.i>=M.inc.length){ if(M.t>=600){M.t=600;M.state="ft";stopTick();renderMatch();} return; }
+  if(M.t>=M.inc[M.i].at){M.state="ask";M.sel={};M.deadline=M.t+WIN;simArrive();whistle();renderMatch();}
+}
+function answer(pick){
+  const q=M.inc[M.i].q; let got=0;
+  if(pick&&typeof pick==="object") got=((pick.r===q.two.r?1:0)+(pick.s===q.two.s?1:0))/2;
+  else if(pick!==null) got=pick===q.a?1:0;
+  const r={q,got,w:q.w||1,pick}; M.res.push(r); M.fb=r; M.i++; M.state="wait"; SIM.script=false; renderMatch();
+}
+const pickText=p=>p===null?"No decision in time":typeof p==="object"?p.r+", "+p.s.toLowerCase():p;
+const minuteOf=t=>Math.min(90,Math.floor(t/600*90)+1);
+function mmss(){const s=Math.floor(M.t/600*5400);return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
+function paintClock(){
+  const c=$("clk"); if(c)c.textContent=mmss();
+  const b=$("winbar"); if(b&&M.state==="ask"){const left=Math.max(0,M.deadline-M.t);b.style.width=(left/WIN*100)+"%";b.className=left<5?"low":"";}
+}
+function report(){
+  const tot=M.res.reduce((a,r)=>a+r.w,0), earned=M.res.reduce((a,r)=>a+r.got*r.w,0), pct=Math.round(earned/tot*100);
+  const b=getBest(); if(b.match==null||pct>b.match){b.match=pct;setBest(b);} showBest();
+  const full=M.res.filter(r=>r.got===1).length, key=M.res.filter(r=>r.w>1), keyOk=key.filter(r=>r.got===1).length;
+  const cats={}; M.res.forEach(r=>{const c=cats[r.q.cat]||(cats[r.q.cat]={e:0,t:0});c.e+=r.got*r.w;c.t+=r.w;});
+  const rows=Object.keys(cats).sort().map(k=>{const p=Math.round(cats[k].e/cats[k].t*100);return `<span>${k}</span><span class="bar"><i style="width:${p}%"></i></span><span>${p}%</span>`;}).join("");
+  const verdict=pct>=90?"An excellent performance with very little to review.":pct>=75?"A good match, with a few calls to look at again.":pct>=55?"You kept the match going, but several calls need work.":"A difficult match. Go through the calls below and play again.";
+  const miss=M.res.filter(r=>r.got<1).map(r=>`<li><div>${esc(r.q.t==="signal"?r.q.who+": "+r.q.ctx:r.q.q)}</div><div class="y">Your call: ${esc(pickText(r.pick))}</div><div class="a">${esc(r.q.a)}</div><div class="law">${r.q.law}${r.w>1?" · key incident":""}</div></li>`).join("");
+  return `<div class="kind"><b>FT</b>Match report</div><div class="total">${pct}<small>% match accuracy</small></div><p class="q">${verdict}</p><p class="ctx">${full} of ${M.res.length} calls fully right. Key incidents: ${keyOk} of ${key.length}.</p><div class="areas">${rows}</div>${miss?`<ul class="review">${miss}</ul>`:""}<button class="go" id="again">Play another match</button>`;
+}
+function renderMatch(){
+  animTok++;
+  const pips=M.inc.map((_,i)=>{const r=M.res[i];return `<i class="${r?(r.got===1?"ok":r.got===0?"no":"part"):(i===M.i&&M.state==="ask"?"now":"")}"></i>`;}).join("");
+  $("status").innerHTML=`<span class="clock" id="clk">${mmss()}</span><span class="pips" aria-hidden="true">${pips}</span><span>${M.state==="ft"?"Full time":M.state==="ht"?"Half-time":M.h2?"2nd half":"1st half"}</span>`;
+  let h="", q=null;
+  if(M.state==="pre"){
+    h=`<div class="kind"><b>KO</b>Match mode</div><p class="q">Ten minutes on the clock for ninety minutes of football.</p><ul class="rules"><li>${M.inc.length} incidents arrive as the match clock runs. You have ${WIN} seconds to make each call, or it counts as missed.</li><li>For fouls you choose the restart and the card separately. Each is worth half the call.</li><li>Penalties, red cards and goal decisions count double towards your match accuracy.</li></ul><button class="go" id="ko">Kick off</button>`;
+  }else if(M.state==="ht"){
+    h=`<div class="kind"><b>HT</b>Half-time</div><p class="q">${M.res.filter(r=>r.got===1).length} of ${M.res.length} calls fully right so far.</p><p class="ctx">The clock is stopped. Your accuracy score comes at full time.</p><button class="go" id="h2">Start second half</button>`;
+  }else if(M.state==="ft"){
+    h=report();
+  }else if(M.state==="wait"){
+    if(!M.fb) h=`<div class="kind"><b>${minuteOf(M.t)}'</b>Play is under way</div><p class="q">${M.h2?"The second half has started.":"The match has kicked off."} The first incident is moments away.</p>`;
+    else{const r=M.fb, cls=r.got===1?"t-ok":r.got===0?"t-no":"t-part", lab=r.got===1?"Correct call.":r.pick===null?"No decision. Time ran out.":r.got===0?"Wrong call.":"Half right.";
+      const nx=(!M.h2&&M.i>=FIRST)?"Half-time is next.":M.i>=M.inc.length?"Full time is next.":"Next incident around "+minuteOf(M.inc[M.i].at)+"'.";
+      h=`<div class="kind"><b>${minuteOf(M.t)}'</b>Decision made</div><p class="q"><span class="${cls}">${lab}</span> ${esc(r.q.a)}.</p><p class="why">${esc(r.q.why)}</p><div class="law">${r.q.law}</div><div class="row"><button class="go" id="skip">Play on</button><span class="law">${nx}</span></div>`;}
+  }else{
+    const it=M.inc[M.i]; q=it.q;
+    const head=`<div class="win"><i id="winbar" style="width:100%"></i></div><div class="kind"><b>${minuteOf(M.t)}'</b>${q.t==="signal"?q.who+": what is the signal?":"Make the call"}</div>`;
+    const btns=it.opts.map((o,i)=>`<button id="mopt-${i}" data-m="${i}"><em>${"ABCD"[i]}</em><span>${esc(o)}</span></button>`).join("");
+    if(q.t==="signal") h=head+`<p class="ctx">${esc(q.ctx)}</p><div class="stage"><div class="figcol"><div class="fig">${figure(q,{L:REST,R:REST},{})}</div><button class="replay" id="replay">Replay signal</button></div><div class="opts">${btns}</div></div>`;
+    else if(q.two) h=head+`<p class="q">${esc(q.q)}</p><div class="pick"><span>Restart</span><div class="chips">${RS.map((x,i)=>`<button id="r-${i}" data-r="${i}" aria-pressed="false">${x}</button>`).join("")}</div></div><div class="pick"><span>Card</span><div class="chips">${SS.map((x,i)=>`<button id="s-${i}" data-s="${i}" aria-pressed="false">${x}</button>`).join("")}</div></div>`;
+    else h=head+`<p class="q">${esc(q.q)}</p><div class="opts">${btns}</div>`;
+  }
+  $("card").innerHTML=h;
+  $("live").hidden=M.state==="ft"; simDraw();
+  if(q&&q.t==="signal")play(q);
+  const f=$("skip")||$("again"); if(f)f.focus();
+}
+/* ---- Whistle: synthesised, starts only after a click ---- */
+let AC=null, soundOn=true;
+try{soundOn=localStorage.getItem("rct-sound")!=="off";}catch(e){}
+function audioInit(){
+  if(!AC){const K=window.AudioContext||window.webkitAudioContext; if(K){try{AC=new K();}catch(e){}}}
+  if(AC&&AC.state==="suspended")AC.resume().catch(()=>{});
+}
+function whistle(dur){
+  if(!soundOn||!AC)return; dur=dur||.5;
+  const t=AC.currentTime+.01, g=AC.createGain(); g.connect(AC.destination);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.16,t+.02); g.gain.setValueAtTime(.16,t+dur-.07); g.gain.linearRampToValueAtTime(0,t+dur);
+  [2850,3010].forEach(fq=>{
+    const o=AC.createOscillator(), l=AC.createOscillator(), lg=AC.createGain(), og=AC.createGain();
+    o.type="sine"; o.frequency.value=fq; l.frequency.value=36; lg.gain.value=70; og.gain.value=.5;
+    l.connect(lg); lg.connect(o.frequency); o.connect(og); og.connect(g);
+    o.start(t); l.start(t); o.stop(t+dur); l.stop(t+dur);
+  });
+}
+$("live").addEventListener("click",e=>{
+  const b=e.target.closest("#snd"); if(!b)return;
+  soundOn=!soundOn; try{localStorage.setItem("rct-sound",soundOn?"on":"off");}catch(e){}
+  b.setAttribute("aria-pressed",soundOn); b.textContent=soundOn?"Whistle on":"Whistle off";
+  if(soundOn){audioInit();whistle(.25);}
+});
+/* ---- Live pitch: a light formation model, not a re-enactment of each incident ---- */
+const RED=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const HOME=[[5,34,0],[22,10,.45],[20,26,.45],[20,42,.45],[22,58,.45],[40,10,.6],[38,27,.6],[38,41,.6],[40,58,.6],[58,26,.65],[58,42,.65]];
+const SIM={A:[],B:[],ball:{x:52.5,y:34},ref:{x:46,y:34},ar1:{x:75,y:70.5},ar2:{x:30,y:-2.5},holder:null,pass:null,hold:0,poss:"A",script:false};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const incAt=q=>q.at||(q.who==="Referee"?[60,30]:[78,60]);
+function moveTo(o,tx,ty,max){const dx=tx-o.x,dy=ty-o.y,d=Math.hypot(dx,dy);if(d<=max||d===0){o.x=tx;o.y=ty;}else{o.x+=dx/d*max;o.y+=dy/d*max;}}
+function near(list,x,y){let best=null,bd=1e9;list.forEach((p,k)=>{if(!k)return;const d=Math.hypot(p.x-x,p.y-y);if(d<bd){bd=d;best=p;}});return best;}
+function simReset(){
+  SIM.A=HOME.map(h=>({x:h[0]*.8,y:h[1]})); SIM.B=HOME.map(h=>({x:105-h[0]*.8,y:h[1]}));
+  Object.assign(SIM,{ball:{x:52.5,y:34},ref:{x:46,y:40},ar1:{x:80,y:70.5},ar2:{x:25,y:-2.5},holder:SIM.A[9],pass:null,hold:.8,poss:"A",script:false});
+}
+function newPass(){
+  const b=SIM.ball, h=SIM.holder, turn=Math.random()<.18, team=turn?(SIM.poss==="A"?"B":"A"):SIM.poss;
+  let pool=SIM[team].filter((p,k)=>k&&p!==h&&Math.hypot(p.x-b.x,p.y-b.y)<42);
+  if(!pool.length)pool=SIM[team].filter((p,k)=>k&&p!==h);
+  const to=pool[Math.floor(Math.random()*pool.length)], d=Math.hypot(to.x-b.x,to.y-b.y);
+  SIM.pass={fx:b.x,fy:b.y,tx:to.x,ty:to.y,t:0,d:Math.max(.35,d/26),to,team}; SIM.holder=null;
+}
+function simStep(dt){
+  const b=SIM.ball, next=M.inc[M.i], live=next&&!(!M.h2&&M.i>=FIRST);
+  if(live&&!SIM.script&&next.at-M.t<=3){const P=incAt(next.q);SIM.script=true;SIM.holder=null;SIM.pass={fx:b.x,fy:b.y,tx:P[0],ty:P[1],t:0,d:Math.max(.3,next.at-M.t)};}
+  if(SIM.pass){const p=SIM.pass;p.t+=dt;const u=Math.min(1,p.t/p.d);b.x=p.fx+(p.tx-p.fx)*u;b.y=p.fy+(p.ty-p.fy)*u;
+    if(u>=1){if(p.to){SIM.holder=p.to;SIM.poss=p.team;SIM.hold=.5+Math.random()*.9;}SIM.pass=null;}}
+  else if(SIM.holder){const h=SIM.holder;b.x=h.x+(SIM.poss==="A"?1.2:-1.2);b.y=h.y;SIM.hold-=dt;if(SIM.hold<=0&&!SIM.script)newPass();}
+  else if(!SIM.script){const a=near(SIM.A,b.x,b.y),c=near(SIM.B,b.x,b.y);const useA=Math.hypot(a.x-b.x,a.y-b.y)<=Math.hypot(c.x-b.x,c.y-b.y);SIM.holder=useA?a:c;SIM.poss=useA?"A":"B";SIM.hold=.7;}
+  simBodies(dt);
+}
+function simBodies(dt,snap){
+  const b=SIM.ball, sp=snap?1e4:11*dt, P=SIM.script&&M.inc[M.i]?incAt(M.inc[M.i].q):null;
+  ["A","B"].forEach(T=>{
+    const team=SIM[T], dir=T==="A"?1:-1, chase=near(team,P?P[0]:b.x,P?P[1]:b.y), chasing=P||SIM.poss!==T||(!SIM.holder&&!SIM.pass);
+    team.forEach((p,k)=>{
+      const hx=T==="A"?HOME[k][0]:105-HOME[k][0];
+      let tx=hx+(b.x-52.5)*(k?HOME[k][2]:.04), ty=HOME[k][1]+(b.y-34)*(k?.3:.12), v=sp;
+      if(SIM.pass&&SIM.pass.to===p){tx=SIM.pass.tx;ty=SIM.pass.ty;}
+      else if(p===SIM.holder){tx=p.x+dir*6;ty=p.y+(34-p.y)*.05;v=snap?0:5*dt;}
+      else if(p===chase&&chasing){tx=P?P[0]-dir*1.5:b.x;ty=P?P[1]:b.y;}
+      moveTo(p,clamp(tx,1,104),clamp(ty,1,67),v);
+    });
+  });
+  const xb=SIM.B.map(p=>p.x).sort((a,c)=>c-a)[1], xa=SIM.A.map(p=>p.x).sort((a,c)=>a-c)[1], dir=SIM.poss==="A"?1:-1;
+  moveTo(SIM.ar1,clamp(Math.max(xb,b.x),52.5,105),70.5,snap?1e4:13*dt);
+  moveTo(SIM.ar2,clamp(Math.min(xa,b.x),0,52.5),-2.5,snap?1e4:13*dt);
+  moveTo(SIM.ref,clamp(b.x-dir*6,4,101),clamp(b.y-10*Math.tanh((b.x-52.5)/18),4,64),snap?1e4:9*dt);
+}
+function simArrive(){const P=incAt(M.inc[M.i].q);SIM.ball.x=P[0];SIM.ball.y=P[1];SIM.pass=null;SIM.holder=null;SIM.script=true;if(RED)simBodies(0,true);}
+function simBuild(){
+  const dots=(c,n)=>HOME.map((_,k)=>`<circle id="${n}${k}" class="${c}" r="1.5"/>`).join("");
+  $("live").innerHTML=`<svg viewBox="-5 -6 115 80" role="img" aria-label="Live pitch view showing the ball, both teams, the referee and the two assistant referees"><rect class="p-grass" x="0" y="0" width="105" height="68"/><g class="p-line"><rect x="0" y="0" width="105" height="68"/><line x1="52.5" y1="0" x2="52.5" y2="68"/><circle cx="52.5" cy="34" r="9.15"/><rect x="0" y="13.85" width="16.5" height="40.3"/><rect x="88.5" y="13.85" width="16.5" height="40.3"/><rect x="0" y="24.85" width="5.5" height="18.3"/><rect x="99.5" y="24.85" width="5.5" height="18.3"/><rect x="-2" y="30.34" width="2" height="7.32"/><rect x="105" y="30.34" width="2" height="7.32"/></g><circle id="sring" class="p-pulse" r="3"/><circle id="sring2" class="s-ring" r="4.2"/>${dots("s-a","pa")}${dots("s-b","pb")}<rect id="sar1" class="s-off" width="3.2" height="3.2"/><rect id="sar2" class="s-off" width="3.2" height="3.2"/><circle id="sref" class="s-off" r="2"/><circle id="sball" class="s-ball" r="1.2"/></svg><div class="legend"><span><i class="lo"></i>Referee</span><span><i class="lo sq"></i>Assistant referees</span><span><i class="lb"></i>Ball</span><span><i class="la"></i>Attacking right</span><span><i class="lt"></i>Attacking left</span><button class="replay" id="snd" aria-pressed="${soundOn}">${soundOn?"Whistle on":"Whistle off"}</button></div>`;
+}
+function simDraw(){
+  if(!$("sball"))return;
+  const set=(id,o)=>{const e=$(id);e.setAttribute("cx",o.x.toFixed(2));e.setAttribute("cy",o.y.toFixed(2));};
+  SIM.A.forEach((p,k)=>set("pa"+k,p)); SIM.B.forEach((p,k)=>set("pb"+k,p));
+  set("sref",SIM.ref); set("sball",SIM.ball);
+  [["sar1",SIM.ar1],["sar2",SIM.ar2]].forEach(([id,o])=>{const e=$(id);e.setAttribute("x",(o.x-1.6).toFixed(2));e.setAttribute("y",(o.y-1.6).toFixed(2));});
+  const show=M.state==="ask"; let o=null;
+  if(show){const q=M.inc[M.i].q;o=q.t==="signal"?(q.who==="Referee"?SIM.ref:SIM.ar1):{x:q.at[0],y:q.at[1]};}
+  ["sring","sring2"].forEach(id=>{const e=$(id);e.style.display=show?"":"none";if(o)set(id,o);});
+}
+function matchClick(e){
+  const b=e.target.closest("button"); if(!b)return;
+  if(b.id==="ko"){audioInit();M.state="wait";M.fb=null;startTick();renderMatch();return;}
+  if(b.id==="h2"){audioInit();simReset();M.h2=true;M.state="wait";M.fb=null;M.last=performance.now();renderMatch();return;}
+  if(b.id==="again"){startMatch();return;}
+  if(b.id==="skip"){ if(M.state!=="wait")return;
+    M.t=(!M.h2&&M.i>=FIRST)?HALF:M.i>=M.inc.length?600:Math.max(M.t,M.inc[M.i].at-1.5); advance(); paintClock(); return; }
+  if(M.state!=="ask")return;
+  if(b.id==="replay"){play(M.inc[M.i].q);return;}
+  if(b.dataset.m!=null){answer(M.inc[M.i].opts[+b.dataset.m]);return;}
+  const k=b.dataset.r!=null?"r":b.dataset.s!=null?"s":null; if(!k)return;
+  M.sel[k]=(k==="r"?RS:SS)[+b.dataset[k]];
+  b.parentNode.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  if(M.sel.r&&M.sel.s)answer({r:M.sel.r,s:M.sel.s});
+}
+simBuild();simReset();
+start();
+</script>
+</body>
+</html>
