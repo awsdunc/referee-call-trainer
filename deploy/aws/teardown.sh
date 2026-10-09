@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Removes everything deploy.sh created: empties the bucket, then deletes the stack.
+# This also deletes the leaderboard table and every score in it.
 set -euo pipefail
 
 STACK_NAME="${STACK_NAME:-referee-call-trainer}"

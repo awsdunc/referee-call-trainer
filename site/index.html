@@ -133,6 +133,18 @@ footer{font-size:.85rem;color:var(--muted);max-width:62ch}
 .areas .bar{height:8px;background:var(--line);border-radius:1px;min-width:40px}
 .areas .bar i{display:block;height:100%;background:var(--ink);border-radius:1px}
 .review .y{color:var(--muted)}
+.lbbox{border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.lbbox form{display:flex;flex-wrap:wrap;gap:8px}
+.lbbox input{font:500 1rem var(--body);padding:9px 12px;border:1.5px solid var(--line);border-radius:3px;background:var(--surface);color:var(--ink);min-width:0;flex:1 1 160px}
+.lbbox input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.lbbox .go{align-self:auto}
+.lbbox .law:empty{display:none}
+.lb{list-style:none;margin:0;padding:0;font-variant-numeric:tabular-nums}
+.lb li{display:grid;grid-template-columns:2.2em 1fr auto;gap:10px;padding:7px 6px;border-bottom:1px solid var(--line)}
+.lb li span:first-child,.lb li span:last-child{font:700 1.05rem var(--display)}
+.lb li span:first-child{color:var(--muted)}
+.lb li span:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb li.me{background:var(--accent);color:var(--accent-ink)} .lb li.me span{color:var(--accent-ink)}
 @media (max-width:520px){.figcol{align-items:center}.stage{grid-template-columns:1fr}.fig{max-width:220px;margin-inline:auto}h1{font-size:1.7rem}.card{padding:16px}}
 </style>
 </head>
@@ -471,14 +483,14 @@ document.querySelector(".modes").addEventListener("click",e=>{
 
 /* ---- Match mode: 600 real seconds stand for 90 match minutes ---- */
 const WIN=15, HALF=300, FIRST=13, RS=["Play on","Direct free kick","Indirect free kick","Penalty kick"], SS=["No card","Yellow card","Red card"];
-const M={state:"pre",t:0,inc:[],i:0,res:[],h2:false,fb:null,sel:{},timer:null,last:0,deadline:0};
+const M={pct:0,sent:false,state:"pre",t:0,inc:[],i:0,res:[],h2:false,fb:null,sel:{},timer:null,last:0,deadline:0};
 function stopTick(){cancelAnimationFrame(M.timer);M.timer=null;}
 function startTick(){stopTick();M.last=performance.now();const loop=()=>{M.timer=requestAnimationFrame(loop);tick();};M.timer=requestAnimationFrame(loop);}
 function startMatch(){
   stopTick();
   const list=shuffle(shuffle(S).slice(0,4).concat(shuffle(C).slice(0,21)));
   M.inc=list.map((q,k)=>({q,opts:shuffle([q.a].concat(q.d)),at:k<FIRST?6+k*22.5:HALF+8+(k-FIRST)*24}));
-  Object.assign(M,{state:"pre",t:0,i:0,res:[],h2:false,fb:null,sel:{}});
+  Object.assign(M,{state:"pre",t:0,i:0,res:[],h2:false,fb:null,sel:{},pct:0,sent:false});
   simReset();
   showBest();renderMatch();
 }
@@ -511,13 +523,13 @@ function paintClock(){
 }
 function report(){
   const tot=M.res.reduce((a,r)=>a+r.w,0), earned=M.res.reduce((a,r)=>a+r.got*r.w,0), pct=Math.round(earned/tot*100);
-  const b=getBest(); if(b.match==null||pct>b.match){b.match=pct;setBest(b);} showBest();
+  M.pct=pct; const b=getBest(); if(b.match==null||pct>b.match){b.match=pct;setBest(b);} showBest();
   const full=M.res.filter(r=>r.got===1).length, key=M.res.filter(r=>r.w>1), keyOk=key.filter(r=>r.got===1).length;
   const cats={}; M.res.forEach(r=>{const c=cats[r.q.cat]||(cats[r.q.cat]={e:0,t:0});c.e+=r.got*r.w;c.t+=r.w;});
   const rows=Object.keys(cats).sort().map(k=>{const p=Math.round(cats[k].e/cats[k].t*100);return `<span>${k}</span><span class="bar"><i style="width:${p}%"></i></span><span>${p}%</span>`;}).join("");
   const verdict=pct>=90?"An excellent performance with very little to review.":pct>=75?"A good match, with a few calls to look at again.":pct>=55?"You kept the match going, but several calls need work.":"A difficult match. Go through the calls below and play again.";
   const miss=M.res.filter(r=>r.got<1).map(r=>`<li><div>${esc(r.q.t==="signal"?r.q.who+": "+r.q.ctx:r.q.q)}</div><div class="y">Your call: ${esc(pickText(r.pick))}</div><div class="a">${esc(r.q.a)}</div><div class="law">${r.q.law}${r.w>1?" · key incident":""}</div></li>`).join("");
-  return `<div class="kind"><b>FT</b>Match report</div><div class="total">${pct}<small>% match accuracy</small></div><p class="q">${verdict}</p><p class="ctx">${full} of ${M.res.length} calls fully right. Key incidents: ${keyOk} of ${key.length}.</p><div class="areas">${rows}</div>${miss?`<ul class="review">${miss}</ul>`:""}<button class="go" id="again">Play another match</button>`;
+  return `<div class="kind"><b>FT</b>Match report</div><div class="total">${pct}<small>% match accuracy</small></div><p class="q">${verdict}</p><p class="ctx">${full} of ${M.res.length} calls fully right. Key incidents: ${keyOk} of ${key.length}.</p><div class="areas">${rows}</div>${miss?`<ul class="review">${miss}</ul>`:""}<button class="go" id="again">Play another match</button>${lbBox(true)}`;
 }
 function renderMatch(){
   animTok++;
@@ -525,7 +537,7 @@ function renderMatch(){
   $("status").innerHTML=`<span class="clock" id="clk">${mmss()}</span><span class="pips" aria-hidden="true">${pips}</span><span>${M.state==="ft"?"Full time":M.state==="ht"?"Half-time":M.h2?"2nd half":"1st half"}</span>`;
   let h="", q=null;
   if(M.state==="pre"){
-    h=`<div class="kind"><b>KO</b>Match mode</div><p class="q">Ten minutes on the clock for ninety minutes of football.</p><ul class="rules"><li>${M.inc.length} incidents arrive as the match clock runs. You have ${WIN} seconds to make each call, or it counts as missed.</li><li>For fouls you choose the restart and the card separately. Each is worth half the call.</li><li>Penalties, red cards and goal decisions count double towards your match accuracy.</li></ul><button class="go" id="ko">Kick off</button>`;
+    h=`<div class="kind"><b>KO</b>Match mode</div><p class="q">Ten minutes on the clock for ninety minutes of football.</p><ul class="rules"><li>${M.inc.length} incidents arrive as the match clock runs. You have ${WIN} seconds to make each call, or it counts as missed.</li><li>For fouls you choose the restart and the card separately. Each is worth half the call.</li><li>Penalties, red cards and goal decisions count double towards your match accuracy.</li></ul><button class="go" id="ko">Kick off</button>${lbBox(false)}`;
   }else if(M.state==="ht"){
     h=`<div class="kind"><b>HT</b>Half-time</div><p class="q">${M.res.filter(r=>r.got===1).length} of ${M.res.length} calls fully right so far.</p><p class="ctx">The clock is stopped. Your accuracy score comes at full time.</p><button class="go" id="h2">Start second half</button>`;
   }else if(M.state==="ft"){
@@ -547,7 +559,38 @@ function renderMatch(){
   $("live").hidden=M.state==="ft"; simDraw();
   if(q&&q.t==="signal")play(q);
   const f=$("skip")||$("again"); if(f)f.focus();
+  const ni=$("lbname"); if(ni)ni.value=lbName;
+  if($("lb"))lbLoad(0);
 }
+/* ---- Leaderboard: best match accuracy, kept by the /api/scores backend. Hidden when there is no backend. ---- */
+const LB_API="/api/scores", LB_NAME=/^[\p{L}\p{N} ._'-]{1,20}$/u;
+let lbName=""; try{lbName=localStorage.getItem("rct-name")||"";}catch(e){}
+let lbSeq=0;
+function lbBox(form){
+  return `<section class="lbbox" id="lb" hidden><div class="kind"><b>TOP 10</b>Leaderboard</div>${form?`<form id="lbform" novalidate><input id="lbname" maxlength="20" autocomplete="nickname" placeholder="Your name" aria-label="Your name for the leaderboard"><button class="go" type="submit">Submit ${M.pct}%</button></form>`:""}<p class="law" id="lbmsg" aria-live="polite"></p><div id="lblist"></div></section>`;
+}
+async function lbLoad(hi){
+  const n=++lbSeq;
+  try{
+    const r=await fetch(LB_API,{headers:{accept:"application/json"}}); if(!r.ok)throw new Error();
+    const {scores}=await r.json(), box=$("lb"); if(!box||n!==lbSeq)return;
+    $("lblist").innerHTML=scores.length?`<ol class="lb">${scores.slice(0,10).map((s,i)=>`<li${i+1===hi?' class="me"':""}><span>${i+1}</span><span>${esc(s.name)}</span><span>${s.pct}%</span></li>`).join("")}</ol>`:`<p class="ctx">No scores yet. Finish a match to be first on the board.</p>`;
+    box.hidden=false;
+  }catch(e){const box=$("lb"); if(box&&n===lbSeq)box.hidden=true;}
+}
+$("card").addEventListener("submit",async e=>{
+  if(e.target.id!=="lbform")return; e.preventDefault();
+  const form=e.target, msg=$("lbmsg"), btn=form.querySelector("button"), name=$("lbname").value.trim().replace(/\s+/g," ");
+  if(M.sent||btn.disabled)return;
+  if(!LB_NAME.test(name)){msg.textContent="Use 1 to 20 letters, numbers or spaces.";return;}
+  btn.disabled=true; msg.textContent="Saving your score…";
+  try{
+    const r=await fetch(LB_API,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({name,pct:M.pct})});
+    const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d.error||"");
+    M.sent=true; lbName=name; try{localStorage.setItem("rct-name",name);}catch(_){}
+    form.remove(); msg.textContent=`Saved. You are number ${d.rank} on the leaderboard.`; lbLoad(d.rank);
+  }catch(err){btn.disabled=false; msg.textContent=err.message||"Could not save your score. Try again.";}
+});
 /* ---- Whistle: synthesised, starts only after a click ---- */
 let AC=null, soundOn=true;
 try{soundOn=localStorage.getItem("rct-sound")!=="off";}catch(e){}

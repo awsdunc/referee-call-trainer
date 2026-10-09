@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Deploys site/ to AWS: creates (or updates) the S3 + CloudFront stack, uploads the
-# page, and clears the CloudFront cache. Needs the AWS CLI v2 signed in to your account.
+# Deploys site/ to AWS: creates (or updates) the stack (S3 + CloudFront for the page,
+# Lambda + DynamoDB for the leaderboard), uploads the page, and clears the CloudFront cache. Needs the AWS CLI v2 signed in to your account.
 set -euo pipefail
 
 STACK_NAME="${STACK_NAME:-referee-call-trainer}"
@@ -12,6 +12,7 @@ aws cloudformation deploy \
   --region "$REGION" \
   --stack-name "$STACK_NAME" \
   --template-file "$HERE/template.yaml" \
+  --capabilities CAPABILITY_IAM \
   --no-fail-on-empty-changeset
 
 output() {
